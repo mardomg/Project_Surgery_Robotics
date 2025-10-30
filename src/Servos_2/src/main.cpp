@@ -43,6 +43,8 @@ float sumRoll1 = 0, sumRoll2 = 0, sumPitch = 0, sumYaw = 0;
 float OldValueRoll = 0, OldValuePitch = 0, OldValueYaw = 0;
 float roll = 0, pitch = 0, yaw = 0;
 int s1 = 1, s2 = 1;
+float yaw_reference = 0.0;
+bool first_time = true;
 
 void connectToWiFi() {
   Serial.print("Connecting to Wi-Fi");
@@ -115,12 +117,26 @@ float getTorque(float& sum, int analogPin, float& previous) {
 }
 
 void moveServos() {
-  roll = Gri_roll;
-  OldValueRoll = roll;
-  pitch = Gri_pitch;
-  OldValuePitch = pitch;
-  yaw = Gri_yaw;
-  OldValueYaw = yaw;
+
+  if(Gri_roll >= 270 && Gri_roll <= 360){
+    roll= 90 + Gri_roll - 360;
+    OldValueRoll = roll;
+  } 
+
+  else if(Gri_roll >= 0 && Gri_roll <= 90) {
+    roll = 90 + Gri_roll;
+    OldValueRoll = roll;
+  }
+  if (Gri_pitch >= 270 && Gri_pitch <= 360) {
+    pitch = 90 + Gri_pitch - 360;
+    OldValuePitch = pitch;
+  }
+
+  else if (Gri_pitch >= 0 && Gri_pitch <= 90) {
+    pitch = 90 + Gri_pitch;
+    OldValuePitch = pitch;
+  }
+
 
   float delta = 0;
   if (s1 == 0) {
@@ -133,44 +149,6 @@ void moveServos() {
   servo_pitch.write(pitch);
   servo_yaw.write(yaw);
 }
-
-void sendTorquesUDP() {
-  // Calcula el torque com a diferència entre valors actuals i anteriors
-  Torque_roll1 = abs(Gri_roll - OldValueRoll);
-  Torque_pitch = abs(Gri_pitch - OldValuePitch);
-  Torque_yaw   = abs(Gri_yaw - OldValueYaw);
-
-  // Desa els valors anteriors per la següent iteració
-  OldValueRoll = Gri_roll;
-  OldValuePitch = Gri_pitch;
-  OldValueYaw = Gri_yaw;
-
-  // Prepara el missatge JSON
-  JsonDocument doc;
-  doc["device"] = deviceId;
-  doc["Torque_roll1"] = Torque_roll1;
-  doc["Torque_pitch"] = Torque_pitch;
-  doc["Torque_yaw"] = Torque_yaw;
-
-  char jsonBuffer[256];
-  serializeJson(doc, jsonBuffer);
-
-  // IP del Gripper IMU (ajusta segons el teu projecte)
-  IPAddress gripperIP(192, 168, 1, 12);
-
-  udp.beginPacket(gripperIP, udpPort);
-  udp.write((const uint8_t*)jsonBuffer, strlen(jsonBuffer));
-  udp.endPacket();
-
-  // Opcional: imprimeix per monitor
-  Serial.print("Sent torques -> R: ");
-  Serial.print(Torque_roll1);
-  Serial.print(" P: ");
-  Serial.print(Torque_pitch);
-  Serial.print(" Y: ");
-  Serial.println(Torque_yaw);
-}
-
 
 void setup() {
   Serial.begin(115200);
@@ -210,6 +188,5 @@ void setup() {
 void loop() {
   receiveOrientationUDP();
   moveServos();
-  sendTorquesUDP(); 
   delay(10);
 }
