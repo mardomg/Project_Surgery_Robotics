@@ -44,6 +44,10 @@ float OldValueRoll = 0, OldValuePitch = 0, OldValueYaw = 0;
 float roll = 0, pitch = 0, yaw = 0;
 int s1 = 1, s2 = 1;
 float yaw_reference = 0.0;
+float previous_yaw = 0.0;
+float yaw_accumulated = 0.0;
+float delta_yaw = 0.0;
+float delta_yaw_old = 0.0;
 bool first_time = true;
 
 void connectToWiFi() {
@@ -137,6 +141,36 @@ void moveServos() {
     OldValuePitch = pitch;
   }
 
+  // --- YAW (nova lògica incremental) ---
+  if (first_time) {
+    yaw_reference = Gri_yaw;      // fixem el primer valor com a referència
+    previous_yaw = Gri_yaw;
+    yaw_accumulated = 0.0;
+    delta_yaw = 0.0;
+    delta_yaw_old = 0.0;
+    first_time = false;
+
+    Serial.print("Yaw reference set to ");
+    Serial.println(yaw_reference);
+  } else {
+    // Guardem l'increment anterior
+    delta_yaw_old = delta_yaw;
+
+    // Calculem increment actual
+    delta_yaw = Gri_yaw - previous_yaw;
+
+    // Corregim salts de ±180°
+    if (delta_yaw > 180.0) delta_yaw -= 360.0;
+    else if (delta_yaw < -180.0) delta_yaw += 360.0;
+
+    // Actualitzem acumulat i valor anterior
+    yaw_accumulated += delta_yaw;
+    previous_yaw = Gri_yaw;
+
+    // El valor que apliquem al servo és el acumulat
+    yaw = 90 + yaw_accumulated;   // 90 és el punt neutre
+  }
+
 
   float delta = 0;
   if (s1 == 0) {
@@ -154,6 +188,7 @@ void setup() {
   Serial.begin(115200);
   Wire.begin();
   delay(2000);
+
 
   connectToWiFi();
   udp.begin(udpPort);
